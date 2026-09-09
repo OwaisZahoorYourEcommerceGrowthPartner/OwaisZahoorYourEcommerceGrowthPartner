@@ -1,0 +1,12 @@
+{
+  "name": "owais-zahoor-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Public portfolio for Owais Zahoor — Amazon Brand Manager & PPC Expert",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
