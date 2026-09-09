@@ -7,7 +7,7 @@ I help e-commerce brands turn advertising, catalog execution, and operational da
 
 **4+ years of experience** · **25+ brands supported** · **$500K+ advertising spend managed**
 
-[LinkedIn](https://www.linkedin.com/in/owais-zahoor-your-success-partner) · [Email](mailto:owaiszahoor.expertize@gmail.com) · [WhatsApp](https://wa.me/923478282583)
+[Website](https://portfolio-grj-production.up.railway.app) · [LinkedIn](https://www.linkedin.com/in/owais-zahoor-your-success-partner) · [Email](mailto:owaiszahoor.expertize@gmail.com) · [WhatsApp](https://wa.me/923478282583)
 
 ---
 
@@ -42,6 +42,12 @@ I do not treat attributed ROAS as profit. Decisions should account for margins, 
 ## Platforms & tools
 
 Amazon Seller Central · Amazon Vendor Central · Amazon Ads · Walmart Connect · Helium 10 · Data Dive · Data Rova · Excel / Google Sheets
+
+## Public proof of work
+
+- [Amazon PPC Growth Playbook](https://github.com/OwaisZahoorYourEcommerceGrowthPartner/amazon-ppc-growth-playbook)
+- [Walmart Profitability Framework](https://github.com/OwaisZahoorYourEcommerceGrowthPartner/walmart-profitability-framework)
+- [Vendor Central Operations Playbook](https://github.com/OwaisZahoorYourEcommerceGrowthPartner/vendor-central-operations-playbook)
 
 ## Currently developing
 
