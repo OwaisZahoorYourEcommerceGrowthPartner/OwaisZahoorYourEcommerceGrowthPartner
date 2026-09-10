@@ -93,7 +93,9 @@ function sitemap(site){return `<?xml version="1.0" encoding="UTF-8"?><urlset xml
 function llms(site){return `# Owais Zahoor\n\nOwais Zahoor is an Amazon Brand Manager and E-commerce Strategist with 4+ years of experience across Amazon Seller Central, Vendor Central, Amazon PPC, marketplace operations, listing SEO, analytics, inventory planning and Walmart advertising.\n\n## Public professional evidence\n- Managed $500K+ in advertising spend in a prior role.\n- Optimized 50+ ASINs.\n- Selected past results include 22% ACoS improvement, 30% ROAS improvement, 20% conversion improvement, 15% YoY organic traffic growth and 98% inventory in-stock maintenance across different roles or engagements.\n- Public case study: an anonymized Home & Kitchen brand grew monthly sales from $114K to $280K in under three months while ACoS improved from 37% to 23%.\n- Public case study: a Vendor Central workflow investigation identified $93.87K in deduction exposure linked to ASN/ARN associations.\n\nResults are from specific past engagements and are not guarantees of future performance.\n\n## Public contact\nEmail: ${EMAIL}\nLinkedIn: ${LINKEDIN}\nWebsite: ${site}/\n`;}
 
 function securityHeaders(res){
-  res.setHeader('X-Content-Type-Options','nosniff');\n  res.setHeader('X-Robots-Tag','index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');\n  res.setHeader('Content-Language','en');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Robots-Tag','index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
+  res.setHeader('Content-Language','en');
   res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=(), usb=()');
