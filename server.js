@@ -2,7 +2,7 @@ const http = require('http');
 const { URL } = require('url');
 
 const PORT = Number(process.env.PORT || 3000);
-const FALLBACK_SITE = 'https://portfolio-grj-production.up.railway.app';
+const FALLBACK_SITE = 'https://portfolio-production-production.up.railway.app';
 const LINKEDIN = 'https://www.linkedin.com/in/owais-zahoor-your-success-partner';
 const GITHUB = 'https://github.com/OwaisZahoorYourEcommerceGrowthPartner';
 const EMAIL = 'owaiszahoor.expertize@gmail.com';
@@ -88,12 +88,12 @@ function renderHtml(site) {
 <script>const tabs=document.querySelectorAll(".serviceTab"),panels=document.querySelectorAll(".servicePanel");tabs.forEach(tab=>tab.addEventListener("click",()=>{tabs.forEach(t=>t.setAttribute("aria-selected","false"));panels.forEach(p=>p.hidden=true);tab.setAttribute("aria-selected","true");document.getElementById(tab.getAttribute("aria-controls")).hidden=false}));const observer=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add("visible");observer.unobserve(e.target)}}),{threshold:.12});document.querySelectorAll(".reveal").forEach(el=>observer.observe(el));</script></body></html>`;
 }
 
-function robots(site){return `User-agent: *\nAllow: /\n\nSitemap: ${site}/sitemap.xml\n`;}
+function robots(site){return `User-agent: *\\nAllow: /\\n\\nUser-agent: Googlebot\\nAllow: /\\n\\nUser-agent: Bingbot\\nAllow: /\\n\\nUser-agent: GPTBot\\nAllow: /\\n\\nUser-agent: ClaudeBot\\nAllow: /\\n\\nUser-agent: PerplexityBot\\nAllow: /\\n\\nSitemap: ${site}/sitemap.xml\\n`;}
 function sitemap(site){return `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${site}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url></urlset>`;}
 function llms(site){return `# Owais Zahoor\n\nOwais Zahoor is an Amazon Brand Manager and E-commerce Strategist with 4+ years of experience across Amazon Seller Central, Vendor Central, Amazon PPC, marketplace operations, listing SEO, analytics, inventory planning and Walmart advertising.\n\n## Public professional evidence\n- Managed $500K+ in advertising spend in a prior role.\n- Optimized 50+ ASINs.\n- Selected past results include 22% ACoS improvement, 30% ROAS improvement, 20% conversion improvement, 15% YoY organic traffic growth and 98% inventory in-stock maintenance across different roles or engagements.\n- Public case study: an anonymized Home & Kitchen brand grew monthly sales from $114K to $280K in under three months while ACoS improved from 37% to 23%.\n- Public case study: a Vendor Central workflow investigation identified $93.87K in deduction exposure linked to ASN/ARN associations.\n\nResults are from specific past engagements and are not guarantees of future performance.\n\n## Public contact\nEmail: ${EMAIL}\nLinkedIn: ${LINKEDIN}\nWebsite: ${site}/\n`;}
 
 function securityHeaders(res){
-  res.setHeader('X-Content-Type-Options','nosniff');
+  res.setHeader('X-Content-Type-Options','nosniff');\n  res.setHeader('X-Robots-Tag','index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');\n  res.setHeader('Content-Language','en');
   res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=(), usb=()');
