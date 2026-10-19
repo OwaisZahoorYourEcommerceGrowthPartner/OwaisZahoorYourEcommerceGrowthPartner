@@ -69,7 +69,7 @@ function renderHtml(site) {
 
   schema['@graph'].push(...["Amazon PPC","Seller Central management","Vendor Central operations","Walmart advertising","Listing SEO and conversion","A+ content and storefront coordination","Catalog and Brand Registry support","Inventory and promotional planning","Reporting and SOPs"].map(name=>({'@type':'Service',name,provider:{'@id':site+'/#person'},url:site+'/#service-directory'})));
   return `<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="google-site-verification" content="HE52KFuu-9euFbQJ6qsB47Ex26nC_ZzM33wPL4PNS5w">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="google-site-verification" content="D_zPV2jU8oFd4ZclhOKa2otUZhyBpZ6qq3VIwqwYmE0">
 <title>Owais Zahoor - Your E-commerce Partner</title>
 <meta name="description" content="Owais Zahoor is a growth-driven Amazon Brand Manager and E-commerce Strategist with 4+ years across Seller Central, Vendor Central, Amazon PPC, marketplace operations, analytics and Walmart advertising.">
 <link rel="canonical" href="${site}/"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="robots" content="index,follow,max-image-preview:large">
