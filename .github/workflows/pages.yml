@@ -1,4 +1,4 @@
-name: Deploy portfolio to GitHub Pages
+name: Publish portfolio to GitHub Pages
 
 on:
   push:
@@ -9,34 +9,42 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: pages-source
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
         with:
-          enablement: true
+          fetch-depth: 0
 
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./docs
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish static site to Pages branch
+        run: |
+          git fetch origin gh-pages
+          git worktree add pages-output gh-pages
+          mkdir -p pages-output/docs/for-agencies
+          mkdir -p pages-output/docs/vendor-central-launch-readiness-checklist
+          cp docs/index.html pages-output/docs/index.html
+          cp docs/app.js pages-output/docs/app.js
+          cp docs/favicon.svg pages-output/docs/favicon.svg
+          cp docs/robots.txt pages-output/docs/robots.txt
+          cp docs/sitemap.xml pages-output/docs/sitemap.xml
+          cp docs/.nojekyll pages-output/docs/.nojekyll
+          cp docs/for-agencies/index.html pages-output/docs/for-agencies/index.html
+          cp docs/vendor-central-launch-readiness-checklist/index.html pages-output/docs/vendor-central-launch-readiness-checklist/index.html
+          cd pages-output
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          if git diff --cached --quiet; then
+            echo "No site changes to publish."
+            exit 0
+          fi
+          git commit -m "Publish portfolio site"
+          git push origin gh-pages
