@@ -28,16 +28,9 @@ jobs:
         run: |
           git fetch origin gh-pages
           git worktree add pages-output gh-pages
-          mkdir -p pages-output/docs/for-agencies
-          mkdir -p pages-output/docs/vendor-central-launch-readiness-checklist
-          cp docs/index.html pages-output/docs/index.html
-          cp docs/app.js pages-output/docs/app.js
-          cp docs/favicon.svg pages-output/docs/favicon.svg
-          cp docs/robots.txt pages-output/docs/robots.txt
-          cp docs/sitemap.xml pages-output/docs/sitemap.xml
-          cp docs/.nojekyll pages-output/docs/.nojekyll
-          cp docs/for-agencies/index.html pages-output/docs/for-agencies/index.html
-          cp docs/vendor-central-launch-readiness-checklist/index.html pages-output/docs/vendor-central-launch-readiness-checklist/index.html
+          rm -rf pages-output/docs
+          mkdir -p pages-output/docs
+          cp -R docs/. pages-output/docs/
           cd pages-output
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
