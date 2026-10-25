@@ -1,243 +1,69 @@
-const http = require('http');
-const { URL } = require('url');
-
-const PORT = Number(process.env.PORT || 3000);
-const FALLBACK_SITE = 'https://portfolio-production-production.up.railway.app';
-const LINKEDIN = 'https://www.linkedin.com/in/owais-zahoor-your-success-partner';
-const GITHUB = 'https://github.com/OwaisZahoorYourEcommerceGrowthPartner';
-const EMAIL = 'owaiszahoor.expertize@gmail.com';
-const PHONE = '+923478282583';
-const WA = 'https://wa.me/923478282583?text=Hi%20Owais%2C%20I%20found%20your%20portfolio%20and%20would%20like%20to%20discuss%20e-commerce%20growth.';
-const PHOTO = 'https://plain-eeur-prod-public.komododecks.com/202609/09/k6lAjx5gHhgA3ZLEmEOI/image.jpg';
-
-const CLIENT_SCRIPT = `const tabs=document.querySelectorAll(".serviceTab"),panels=document.querySelectorAll(".servicePanel");tabs.forEach(tab=>tab.addEventListener("click",()=>{tabs.forEach(t=>t.setAttribute("aria-selected","false"));panels.forEach(p=>p.hidden=true);tab.setAttribute("aria-selected","true");document.getElementById(tab.getAttribute("aria-controls")).hidden=false}));document.querySelectorAll(".photo").forEach(photo=>photo.addEventListener("error",()=>{photo.style.display="none";const fallback=photo.nextElementSibling;if(fallback)fallback.style.display="grid";}));if("IntersectionObserver" in window&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches){document.documentElement.classList.add("motion-ready");const observer=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add("visible");observer.unobserve(e.target)}}),{threshold:.12});document.querySelectorAll(".reveal").forEach(el=>observer.observe(el));}tabs.forEach((tab,index)=>{tab.tabIndex=index===0?0:-1;tab.addEventListener("click",()=>tabs.forEach(t=>t.tabIndex=t===tab?0:-1));tab.addEventListener("keydown",event=>{let next=index;if(event.key==="ArrowRight")next=(index+1)%tabs.length;else if(event.key==="ArrowLeft")next=(index+tabs.length-1)%tabs.length;else if(event.key==="Home")next=0;else if(event.key==="End")next=tabs.length-1;else return;event.preventDefault();tabs[next].click();tabs[next].focus();});});`;
-const FAVICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#101c30"/><text x="32" y="42" text-anchor="middle" font-family="Arial,sans-serif" font-size="27" font-weight="700" fill="#c5f36b">OZ</text></svg>';
-
-function cleanSite(value) {
-  if (!value) return null;
-  try {
-    const u = new URL(value);
-    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
-    return `${u.protocol}//${u.host}`;
-  } catch (_) { return null; }
+'use strict';
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const ROOT = path.join(__dirname, 'docs');
+const MIME = {'.html':'text/html', '.js':'application/javascript', '.svg':'image/svg+xml', '.xml':'application/xml', '.txt':'text/plain', '.webp':'image/webp', '.jpg':'image/jpeg', '.png':'image/png'};
+function createServer(options = {}) {
+  const production = options.production ?? process.env.NODE_ENV === 'production';
+  const raw = options.site ?? process.env.PUBLIC_SITE_URL;
+  let site;
+  if (raw) {
+    site = new URL(raw);
+    if (site.protocol !== 'https:' || site.username || site.password || site.search || site.hash) throw new Error('PUBLIC_SITE_URL must be a clean HTTPS URL');
+    site = site.href.replace(/\/$/, '');
+  } else if (production) throw new Error('PUBLIC_SITE_URL is required in production');
+  const allowed = (options.allowedHosts ?? process.env.ALLOWED_HOSTS ?? '').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+  if (production && !allowed.length) throw new Error('ALLOWED_HOSTS is required in production');
+  const routes = new Map();
+  function walk(dir, prefix='') {
+    for (const entry of fs.readdirSync(dir, {withFileTypes:true})) {
+      const rel = prefix + entry.name;
+      if (entry.isDirectory()) walk(path.join(dir, entry.name), rel+'/');
+      else if (!entry.name.startsWith('.')) routes.set('/'+rel, path.join(dir, entry.name));
+    }
+  }
+  walk(ROOT);
+  const server = http.createServer((req,res)=>{
+    res.setHeader('X-Content-Type-Options','nosniff');
+    res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
+    res.setHeader('X-Frame-Options','DENY');
+    res.setHeader('Content-Security-Policy',"frame-ancestors 'none'");
+    res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
+    res.setHeader('Cache-Control','no-cache');
+    if (production) res.setHeader('Strict-Transport-Security','max-age=31536000');
+    if (allowed.length && !allowed.includes(String(req.headers.host || '').toLowerCase())) {res.writeHead(400);return res.end('Invalid host');}
+    if (!['GET','HEAD'].includes(req.method)) {res.writeHead(405,{'Allow':'GET, HEAD'});return res.end();}
+    let u;
+    try {
+      if (!req.url.startsWith('/') || req.url.startsWith('//')) throw new Error('Invalid target');
+      u = new URL(req.url,'http://localhost');
+      decodeURIComponent(u.pathname);
+    } catch {res.writeHead(400);return res.end('Invalid URL');}
+    if(u.pathname==='/health') {res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});return res.end(req.method==='HEAD'?'':'{"status":"ok"}');}
+    const base = '/OwaisZahoorYourEcommerceGrowthPartner';
+    let pathname = u.pathname;
+    if (pathname===base) pathname='/';
+    else if(pathname.startsWith(base+'/')) pathname=pathname.slice(base.length);
+    let file = routes.get(pathname);
+    if (pathname.endsWith('/')) file = routes.get(pathname+'index.html');
+    if (!file && routes.has(pathname+'/index.html')) {
+      res.writeHead(308,{'Location':(site || base)+pathname+'/'+u.search});return res.end();
+    }
+    if (!file) {res.writeHead(404,{'Content-Type':'text/html; charset=utf-8','X-Robots-Tag':'noindex'});return res.end(req.method==='HEAD'?'':fs.readFileSync(path.join(ROOT,'404.html')));}
+    // Older Node-hosted pages redirect to the authoritative Pages URL.
+    if (site && path.extname(file)==='.html') {
+      const target = site+(pathname==='/'?'/':pathname.replace(/index\.html$/, ''))+u.search;
+      res.writeHead(308,{'Location':target});return res.end();
+    }
+    res.writeHead(200,{'Content-Type':(MIME[path.extname(file)] || 'application/octet-stream')+'; charset=utf-8'});
+    res.end(req.method==='HEAD'?'':fs.readFileSync(file));
+  });
+  server.requestTimeout=15000;server.headersTimeout=10000;server.keepAliveTimeout=5000;
+  return server;
 }
-
-function siteFor(req) {
-  const configured = cleanSite(process.env.PUBLIC_SITE_URL);
-  if (configured) return configured;
-  const forwardedHost = String(req.headers['x-forwarded-host'] || '').split(',')[0].trim();
-  const host = forwardedHost || String(req.headers.host || '').trim();
-  if (!/^[A-Za-z0-9.-]+(?::\d+)?$/.test(host)) return FALLBACK_SITE;
-  const rawProto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim().toLowerCase();
-  const proto = rawProto === 'http' ? 'http' : 'https';
-  return `${proto}://${host}`;
+if (require.main===module) {
+ const server=createServer();server.listen(Number(process.env.PORT || 3000),'0.0.0.0',()=>console.log('Portfolio server ready'));
+ for(const signal of ['SIGTERM','SIGINT']) process.on(signal,()=>{server.close(()=>process.exit(0));setTimeout(()=>process.exit(1),10000).unref();});
 }
-
-function renderHtml(site) {
-  const schema = {
-    '@context': 'https://schema.org',
-    '@graph': [
-      {
-        '@type': 'ProfilePage',
-        '@id': `${site}/#profile`,
-        url: `${site}/`,
-        name: 'Owais Zahoor — Amazon Brand Manager & E-commerce Strategist',
-        mainEntity: { '@id': `${site}/#person` },
-        dateModified: '2026-09-10'
-      },
-      {
-        '@type': 'Person',
-        '@id': `${site}/#person`,
-        name: 'Owais Zahoor',
-        url: `${site}/`,
-        image: PHOTO,
-        jobTitle: 'Amazon Brand Manager & E-commerce Strategist',
-        sameAs: [LINKEDIN, GITHUB],
-        email: `mailto:${EMAIL}`,
-        telephone: PHONE,
-        knowsAbout: ['Amazon Seller Central','Amazon Vendor Central','Amazon PPC','Amazon Advertising','Marketplace Operations','Listing SEO','E-commerce Analytics','Inventory Forecasting','Walmart Advertising']
-      },
-      {
-        '@type': 'WebSite',
-        '@id': `${site}/#website`,
-        url: `${site}/`,
-        name: 'Owais Zahoor - Your E-commerce Partner',
-        publisher: { '@id': `${site}/#person` }
-      }
-    ]
-  };
-
-  schema['@graph'].push(...["Amazon PPC","Seller Central management","Vendor Central operations","Walmart advertising","Listing SEO and conversion","A+ content and storefront coordination","Catalog and Brand Registry support","Inventory and promotional planning","Reporting and SOPs"].map(name=>({'@type':'Service',name,provider:{'@id':site+'/#person'},url:site+'/#service-directory'})));
-  return `<!doctype html><html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="google-site-verification" content="D_zPV2jU8oFd4ZclhOKa2otUZhyBpZ6qq3VIwqwYmE0">
-<title>Owais Zahoor - Your E-commerce Partner</title>
-<meta name="description" content="Owais Zahoor is a growth-driven Amazon Brand Manager and E-commerce Strategist with 4+ years across Seller Central, Vendor Central, Amazon PPC, marketplace operations, analytics and Walmart advertising.">
-<link rel="canonical" href="${site}/"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><meta name="robots" content="index,follow,max-image-preview:large">
-<meta property="og:type" content="profile"><meta property="og:title" content="Owais Zahoor - Your E-commerce Partner"><meta property="og:description" content="Marketplace operations, advertising and analytics for Amazon and Walmart brands."><meta property="og:url" content="${site}/"><meta property="og:image" content="${PHOTO}"><meta property="og:image:alt" content="Owais Zahoor — Amazon Brand Manager and PPC Expert">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="Owais Zahoor - Your E-commerce Partner"><meta name="twitter:description" content="Amazon brand growth across PPC, Seller Central, Vendor Central, operations and analytics."><meta name="twitter:image" content="${PHOTO}">
-<script type="application/ld+json">${JSON.stringify(schema).replace(/</g,'\\u003c')}</script>
-<style>
-:root{--bg:#07111f;--panel:#0d1b2d;--text:#f6f3ea;--muted:#aeb9c7;--gold:#d9ad58;--line:rgba(255,255,255,.1);--max:1160px}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% 5%,#16304d 0,transparent 30%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.65}a{color:inherit;text-decoration:none}.wrap{width:min(var(--max),calc(100% - 40px));margin:auto}.nav{position:sticky;top:0;z-index:10;background:rgba(7,17,31,.9);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}.navin{height:72px;display:flex;align-items:center;justify-content:space-between}.brand{font-weight:850;letter-spacing:.02em}.brand span{color:var(--gold)}.links{display:flex;gap:22px;font-size:14px;color:var(--muted)}.hero{padding:92px 0 64px}.heroGrid{display:grid;grid-template-columns:1.25fr .75fr;gap:70px;align-items:center}.eyebrow{color:var(--gold);font-weight:800;text-transform:uppercase;letter-spacing:.16em;font-size:12px}.hero h1{font-size:clamp(46px,7vw,82px);line-height:.98;margin:14px 0 22px;letter-spacing:-.05em}.hero h1 small{display:block;font-size:.42em;line-height:1.2;color:#d7dfeb;letter-spacing:-.025em;margin-top:18px}.lead{font-size:19px;color:var(--muted);max-width:760px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{padding:13px 18px;border-radius:10px;font-weight:800;border:1px solid var(--line)}.primary{background:var(--gold);color:#07111f;border-color:var(--gold)}.photoShell{position:relative;aspect-ratio:4/5;border-radius:28px;overflow:hidden;border:1px solid rgba(217,173,88,.4);background:linear-gradient(145deg,#152a43,#0a1626);box-shadow:0 30px 80px rgba(0,0,0,.38)}.photo{width:100%;height:100%;object-fit:cover;object-position:center top;display:block}.fallback{position:absolute;inset:0;display:none;place-items:center;font-size:72px;font-weight:900;color:var(--gold)}.section{padding:76px 0;border-top:1px solid var(--line)}.section h2{font-size:clamp(34px,4.5vw,52px);line-height:1.08;letter-spacing:-.035em;margin:8px 0 14px}.intro{color:var(--muted);max-width:780px;margin-bottom:34px}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.metric,.card,.case,.quote{background:linear-gradient(145deg,rgba(16,36,59,.9),rgba(10,24,41,.9));border:1px solid var(--line);border-radius:18px}.metric{padding:22px 16px}.metric b{display:block;color:var(--gold);font-size:26px;line-height:1.1}.metric span{font-size:13px;color:var(--muted)}.cases{display:grid;grid-template-columns:1fr 1fr;gap:18px}.case{padding:30px}.case .tag{font-size:12px;color:var(--gold);font-weight:800;text-transform:uppercase;letter-spacing:.12em}.case h3{font-size:27px;margin:8px 0}.caseStats{display:flex;gap:22px;margin:22px 0;flex-wrap:wrap}.caseStats b{font-size:28px;color:var(--gold)}.case p,.card p,.quote p{color:var(--muted)}.services{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{padding:24px}.card h3{margin:0 0 8px}.quotes{display:grid;grid-template-columns:1fr 1fr;gap:18px}.quote{padding:28px}.quote p{font-size:17px}.quote strong{display:block;margin-top:18px}.quote small{color:var(--gold)}.aboutGrid{display:grid;grid-template-columns:1fr 1fr;gap:50px}.chips{display:flex;gap:9px;flex-wrap:wrap}.chip{border:1px solid var(--line);padding:8px 11px;border-radius:999px;color:#d6deea;font-size:13px}.disclaimer{font-size:12px;color:#7f8b9a;margin-top:22px}.cta{text-align:center;padding:90px 0}.footer{border-top:1px solid var(--line);padding:30px 0 42px;color:#8290a1;font-size:13px}.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}.footlinks{display:flex;gap:18px}.btn{transition:transform .22s ease,background .22s ease}.btn:hover{transform:translateY(-2px)}.metric,.case,.quote,.card{transition:transform .25s ease,border-color .25s ease}.metric:hover,.case:hover,.quote:hover,.card:hover{transform:translateY(-4px);border-color:rgba(217,173,88,.5)}.serviceTabs{display:flex;gap:10px;flex-wrap:wrap;margin:28px 0 14px}.serviceTab{cursor:pointer;background:transparent;color:var(--text);padding:12px 16px;border:1px solid var(--line);border-radius:10px;font-weight:800}.serviceTab[aria-selected="true"]{background:var(--gold);color:var(--bg);border-color:var(--gold)}.servicePanel{padding:30px;background:linear-gradient(145deg,rgba(16,36,59,.9),rgba(10,24,41,.9));border:1px solid var(--line);border-radius:18px;animation:panelIn .28s ease both}.servicePanel h3{margin:0 0 8px;font-size:28px}.servicePanel p,.servicePanel ul{color:var(--muted)}.servicePanel[hidden]{display:none}.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}.reveal.visible{opacity:1;transform:none}@keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
-@media(max-width:900px){.links{display:none}.heroGrid,.aboutGrid{grid-template-columns:1fr}.photoShell{max-width:440px}.metrics{grid-template-columns:repeat(2,1fr)}.services{grid-template-columns:1fr 1fr}.cases,.quotes{grid-template-columns:1fr}}@media(max-width:580px){.wrap{width:min(100% - 28px,var(--max))}.hero h1{font-size:48px}.services{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.section{padding:58px 0}}
-
-/* Personal portfolio redesign */
-:root{--bg:#101c30;--panel:#182a43;--gold:#c5f36b;--text:#f6f8fc;--muted:#bac6d8;--max:1200px}
-body{background:#101c30;line-height:1.7}
-section[id]{scroll-margin-top:100px}
-.nav{background:rgba(16,28,48,.97)}.navin{height:82px}.brand{letter-spacing:-.04em;font-size:21px}
-.hero{padding:105px 0 86px;background:linear-gradient(115deg,#101c30 65%,#1c3551)}
-.heroGrid{grid-template-columns:1.35fr .75fr;gap:65px}
-.hero h1{font-size:clamp(48px,6.2vw,82px);line-height:1.04;letter-spacing:-.055em}
-.hero h1 small{font-size:.29em;letter-spacing:-.02em;color:#c5f36b;margin-top:24px}
-.hero .lead{font-size:18px;max-width:650px}
-.photoShell{border-radius:160px 160px 24px 24px;box-shadow:18px 18px 0 #c5f36b;border:0;max-width:380px}
-.btn{display:inline-flex;align-items:center;justify-content:center;min-height:48px;border-radius:7px;font-size:14px}
-.primary:hover{background:#d7ff8e}.links a:hover,.footlinks a:hover{color:#c5f36b}
-a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #8495ff;outline-offset:5px}
-.section{padding:96px 0}.section h2{max-width:860px;font-size:clamp(34px,4vw,52px)}
-#proof,#services,#about{background:#f5f7fa;color:#142138;--muted:#526176;--gold:#296044;--line:#d8e0e8}
-#proof .eyebrow,#services .eyebrow,#about .eyebrow{color:#296044}
-#proof .metric{background:#fff;border:1px solid #d8e0e8;border-radius:10px;padding:26px 18px}
-#proof .metric b{color:#142138;font-size:29px}.metrics{gap:14px}
-#services .serviceTab{color:#142138;border-color:#c6d1dc;font:inherit;font-weight:700}
-#services .serviceTab[aria-selected="true"]{background:#142138;color:#c5f36b;border-color:#142138}
-#services .servicePanel{background:white;border:1px solid #d8e0e8;border-radius:12px;padding:36px}
-#services .servicePanel p,#services .servicePanel ul{color:#526176}
-#services .servicePanel h3{font-size:30px}
-#services .servicePanel li{margin:12px 0}
-.case,.quote{border-radius:12px;background:#182a43;padding:36px}
-.case h3{font-size:29px;line-height:1.2}.caseStats{padding:24px 0;border-top:1px solid #314158;border-bottom:1px solid #314158}
-.quote strong{color:#fff}.quote p{font-size:19px}
-#about .chip{color:#34445b;border-color:#c6d1dc}
-.cta{background:#c5f36b;color:#142138;padding:90px 0}.cta .eyebrow,.cta .intro{color:#344b30}
-.cta h2{font-size:clamp(32px,4vw,50px);line-height:1.12;max-width:850px;margin:20px auto}
-.cta .primary{background:#142138;color:#fff;border-color:#142138}.cta .btn{border-color:#142138}
-.footer{background:#0b1423}
-.serviceDetails{margin:18px 0;border-top:1px solid #d8e0e8;padding-top:16px}
-.serviceDetails summary{cursor:pointer;font-weight:700;font-size:17px}
-.serviceDetails p{max-width:800px}
-.reveal{opacity:1;transform:none}.motion-ready .reveal{opacity:0;transform:translateY(22px)}
-.motion-ready .reveal.visible{opacity:1;transform:none}
-@media(max-width:900px){.heroGrid{grid-template-columns:1fr;gap:48px}.hero{padding:65px 0}.photoShell{width:75%;max-width:330px;margin:0 auto}.navin{height:auto;min-height:75px;flex-wrap:wrap;padding:15px 0;gap:12px}.links{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:13px}.section{padding:64px 0}}
-@media(max-width:580px){.hero h1{font-size:48px}.serviceTabs{display:grid;grid-template-columns:1fr;width:100%}.serviceTab{width:100%;min-height:48px}.case,.quote,#services .servicePanel{padding:24px}.metrics{grid-template-columns:1fr 1fr}.metric b{overflow-wrap:anywhere}.caseStats b{font-size:25px}}
-@media(prefers-reduced-motion:reduce){.motion-ready .reveal{opacity:1;transform:none}}
-
-</style></head><body>
-<nav class="nav"><div class="wrap navin"><a class="brand" href="#top">OWAIS <span>ZAHOOR</span></a><div class="links"><a href="/for-agencies">For Agencies</a><a href="/vendor-central-launch-readiness-checklist">Resources</a><a href="#proof">Proof</a><a href="#cases">Case Studies</a><a href="#services">Services</a><a href="#toolkit">Toolkit</a><a href="#recommendations">Recommendations</a><a href="#about">About</a><a href="#contact">Contact</a></div></div></nav>
-<main id="top"><section class="hero reveal"><div class="wrap heroGrid"><div><div class="eyebrow">For marketplace brands & agency teams</div><h1>Marketplace growth.<br>Operational clarity.<small>Owais Zahoor · Amazon & Walmart specialist</small></h1><p class="lead">I help e-commerce brands build more profitable marketplace growth across Amazon Seller Central, Vendor Central, PPC, catalog and listing optimization, inventory planning, analytics, and Walmart advertising. My work combines commercial strategy with hands-on execution.</p><div class="actions"><a class="btn primary" href="mailto:${EMAIL}?subject=E-commerce%20Growth%20Opportunity">Discuss a Growth Opportunity</a><a class="btn" href="${WA}" target="_blank" rel="noopener noreferrer">WhatsApp</a><a class="btn" href="${LINKEDIN}" target="_blank" rel="noopener noreferrer">LinkedIn</a></div></div><div class="photoShell"><img class="photo" src="${PHOTO}" alt="Owais Zahoor — Amazon Brand Manager and PPC Expert" referrerpolicy="no-referrer"><div class="fallback">OZ</div></div></div></section>
-<section class="section reveal" id="proof"><div class="wrap"><div class="eyebrow">Selected performance evidence</div><h2>Commercial outcomes, not vanity metrics.</h2><p class="intro">Selected results from different past roles and engagements. Each metric stands on its own and should not be read as coming from a single account.</p><div class="metrics"><div class="metric"><b>$500K+</b><span>advertising spend managed</span></div><div class="metric"><b>50+</b><span>ASINs optimized</span></div><div class="metric"><b>−22%</b><span>ACoS improvement</span></div><div class="metric"><b>+30%</b><span>ROAS improvement</span></div><div class="metric"><b>+20%</b><span>conversion improvement</span></div><div class="metric"><b>+15%</b><span>YoY organic traffic</span></div><div class="metric"><b>98%</b><span>inventory in-stock maintained</span></div><div class="metric"><b>+30%</b><span>Q4 promotional sales</span></div><div class="metric"><b>−40%</b><span>listing errors in a prior operations role</span></div><div class="metric"><b>10+ brands</b><span>brand accounts managed while leading a 6-person Amazon team</span></div></div><p class="disclaimer">Results shown are from specific past engagements and are not guarantees of future performance.</p></div></section>
-<section class="section reveal" id="cases"><div class="wrap"><div class="eyebrow">Case studies</div><h2>What the work looks like when the numbers matter.</h2><p class="intro">Anonymized examples based on publicly shared professional case studies. Client-sensitive details are intentionally excluded.</p><div class="cases"><article class="case"><div class="tag">Amazon Advertising Scale-Up • Home & Kitchen</div><h3>Scale revenue while improving efficiency.</h3><div class="caseStats"><div><b>$114K → $280K</b><br><span>monthly sales, under 3 months</span></div><div><b>37% → 23%</b><br><span>ACoS</span></div></div><p>The account needed cleaner structure and better control—not indiscriminate spend. The work focused on separating targeting types, removing inefficient targets, controlling budgets around opportunity, concentrating spend on profitable search terms, continuous optimization, and training the internal advertising specialist so the system could keep running independently.</p></article><article class="case"><div class="tag">Vendor Central • Revenue Leakage Prevention</div><h3>Find the operational break before it becomes a deduction problem.</h3><div class="caseStats"><div><b>$93.87K</b><br><span>deduction exposure identified</span></div></div><p>A hidden ASN/ARN association issue was traced across the operational chain: Shipment → ASN → ARN → Receiving → Invoice. The investigation identified broken associations, corrected the workflow, improved controls and visibility, and reduced shortage/deduction risk without exposing the client's private account information.</p></article></div><p class="disclaimer">Results shown are from specific past engagements and are not guarantees of future performance.</p></div></section>
-<section class="section reveal" id="services"><div class="wrap"><div class="eyebrow">Core expertise</div><h2>One operator. The whole marketplace picture.</h2><p class="intro">From the ad click to the purchase order: practical support across advertising, catalog, content and operations. Choose your marketplace below.</p><div class="serviceTabs" role="tablist" aria-label="Marketplace services"><button class="serviceTab" role="tab" aria-selected="true" aria-controls="vendor-panel" id="vendor-tab">Vendor Central</button><button class="serviceTab" role="tab" aria-selected="false" aria-controls="seller-panel" id="seller-tab">Seller Central</button><button class="serviceTab" role="tab" aria-selected="false" aria-controls="walmart-panel" id="walmart-tab">Walmart Services</button></div><article class="servicePanel" role="tabpanel" id="vendor-panel" aria-labelledby="vendor-tab" tabindex="0"><h3>Amazon Vendor Central (1P)</h3><p>Operational control and commercial visibility for brands selling directly to Amazon.</p><ul><li>Purchase orders, ASN/ARN workflows and receiving investigation</li><li>Catalog health, retail readiness and content</li><li>Deduction/chargeback risk analysis and root-cause correction</li><li>Forecasting, in-stock planning and reporting</li></ul><details class="serviceDetails"><summary>Operational support, from diagnosis to handoff</summary><p>Purchase-order coordination, shipment and receiving reconciliation, deduction investigations, catalog issue resolution and reporting. I help agency teams turn recurring problems into documented workflows with clear owners.</p></details><div class="actions"><a class="btn primary" href="mailto:${EMAIL}?subject=Marketplace%20Services%20Enquiry">Discuss this service</a></div></article><article class="servicePanel" role="tabpanel" id="seller-panel" aria-labelledby="seller-tab" tabindex="0" hidden><h3>Amazon Seller Central (3P)</h3><p>Hands-on marketplace operations built to protect account health and unlock profitable growth.</p><ul><li>Catalog, variation management, listing health and issue resolution</li><li>Retail-page optimization, keyword research, SEO and conversion</li><li>Account health, promotions, inventory coordination and reporting</li><li>Amazon PPC strategy across Sponsored Products, Brands and Display</li></ul><details class="serviceDetails"><summary>Advertising, retail readiness and account operations</summary><p>Campaign audits and optimization, keyword research, listing SEO, A+ content and storefront coordination, Brand Registry cases, promotions and inventory planning—prioritized around the account’s actual constraints.</p></details><div class="actions"><a class="btn primary" href="mailto:${EMAIL}?subject=Marketplace%20Services%20Enquiry">Discuss this service</a></div></article><article class="servicePanel" role="tabpanel" id="walmart-panel" aria-labelledby="walmart-tab" tabindex="0" hidden><h3>Walmart Marketplace & Advertising</h3><p>Profitability-first advertising and marketplace execution for Walmart growth.</p><ul><li>Sponsored Products structure, search-term analysis and bid strategy</li><li>Retail readiness, listing optimization and catalog troubleshooting</li><li>Margin-aware budget allocation and performance reporting</li><li>Growth plans connecting paid acquisition, conversion and inventory</li></ul><details class="serviceDetails"><summary>A profitability-first approach to Walmart growth</summary><p>Campaign structure, bids, search terms, budgets and item readiness reviewed together. The objective is a practical testing plan tied to margins and conversion, with reporting that explains the next decision.</p></details><div class="actions"><a class="btn primary" href="mailto:${EMAIL}?subject=Marketplace%20Services%20Enquiry">Discuss this service</a></div></article></div></section>
-<section class="section" id="service-directory"><div class="wrap"><div class="eyebrow">Service directory</div><h2>Specialist support, matched to your account.</h2><p class="intro">Engage me for a focused project or ongoing delivery. Scope and responsibilities are agreed before work begins.</p><div class="services"><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Amazon PPC</summary><p>Campaign strategy, Sponsored Products, Brands and Display, search-term analysis, bid management and budget allocation.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Seller Central management</summary><p>Listing health, variations, account issues, promotions and day-to-day marketplace execution.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Vendor Central operations</summary><p>Purchase orders, ASN/ARN workflows, receiving investigations, catalog health and deduction-risk analysis.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Walmart advertising</summary><p>Sponsored Products, search-term analysis, margin-aware budgets and retail-readiness coordination.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Listing SEO & conversion</summary><p>Keyword research, titles, bullets and content recommendations that connect discoverability with conversion.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">A+ content & storefront coordination</summary><p>Content briefs, brand storytelling, creative coordination and implementation support.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Catalog & Brand Registry support</summary><p>Item setup, variation troubleshooting, listing corrections and case management.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Inventory & promotional planning</summary><p>Demand planning, in-stock visibility and promotions coordinated with advertising.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details><details class="card"><summary style="cursor:pointer;font-weight:700;font-size:18px">Reporting & SOPs</summary><p>Actionable performance reporting, repeatable workflows, quality checks and team training.</p><a class="btn" href="mailto:${EMAIL}?subject=Service%20enquiry">Discuss your requirements</a></details></div></div></section>
-<section class="section reveal" id="toolkit"><div class="wrap"><div class="eyebrow">Operating toolkit & custom reporting</div><h2>Tools are useful only when they improve the decision.</h2><p class="intro">I use marketplace intelligence, retail-media, operations and reporting tools to find the constraint, prioritize the next action and give teams a system they can keep using.</p><div class="services"><article class="card"><h3>Marketplace intelligence</h3><p>Helium 10 · Data Dive · Data Rova · Keepa · Amazon Brand Analytics · Search Query Performance</p></article><article class="card"><h3>Advertising & retail media</h3><p>Amazon Ads Console · Pacvue · AdLabs · Xnurta · Walmart Connect</p></article><article class="card"><h3>Commerce operations</h3><p>Sellercloud · Sellerboard · Flat files · Vendor Central workflows · Catalog diagnostics</p></article><article class="card"><h3>Custom reporting</h3><p>Google Sheets & Excel dashboards · Power BI · KPI reporting · SOP-led operating cadences</p></article><article class="card"><h3>Team delivery</h3><p>Asana · ClickUp · Slack · Ownership tracking · Quality-control workflows</p></article><article class="card"><h3>The output</h3><p>Clearer priorities, measurable account health, less manual noise and an operating rhythm teams can run independently.</p></article></div></div></section><section class="section reveal" id="recommendations"><div class="wrap"><div class="eyebrow">Selected LinkedIn recommendations</div><h2>What collaborators say about the work.</h2><p class="intro">These are concise paraphrases of recommendations published on my LinkedIn profile. The original recommendations can be reviewed there.</p><div class="quotes"><div class="quote"><p>Owais took ownership of Amazon and Walmart paid acquisition, scaling advertising while staying focused on ROI. His analytical approach turns performance data into sustainable growth strategy.</p><strong>Daniel Angel</strong><small>LinkedIn recommendation</small></div><div class="quote"><p>Owais learned Seller Central quickly, showed initiative, took ownership and contributed valuable ideas. His progression into a supervisor role reflected that growth and responsibility.</p><strong>Hasaan Ahmed</strong><small>LinkedIn recommendation</small></div></div><div class="actions"><a class="btn" href="${LINKEDIN}" target="_blank" rel="noopener noreferrer">Verify on LinkedIn</a></div></div></section>
-<section class="section reveal" id="about"><div class="wrap aboutGrid"><div><div class="eyebrow">About</div><h2>Brand management with an operator's mindset.</h2><p class="intro">With 4+ years across Amazon marketplace roles, I work at the intersection of advertising, retail execution, catalog operations and analytics. That means diagnosing the system behind performance—not just adjusting bids when the real constraint may be conversion, inventory, content or operational leakage.</p></div><div><h3>Areas I work across</h3><div class="chips"><span class="chip">Amazon Seller Central</span><span class="chip">Amazon Vendor Central</span><span class="chip">Amazon PPC</span><span class="chip">Listing SEO</span><span class="chip">Keyword Research</span><span class="chip">Analytics & KPIs</span><span class="chip">Inventory Forecasting</span><span class="chip">Promotions</span><span class="chip">Walmart Advertising</span><span class="chip">SOPs & Dashboards</span><span class="chip">Team Leadership</span><span class="chip">Growth Strategy</span></div></div></div></section>
-<section class="cta reveal" id="contact"><div class="wrap"><div class="eyebrow">Let's talk growth</div><h2>Need someone who can connect marketplace strategy to execution?</h2><p class="intro" style="margin-left:auto;margin-right:auto">Tell me where the account is today, what is blocking growth, and what success needs to look like.</p><div class="actions" style="justify-content:center"><a class="btn primary" href="mailto:${EMAIL}?subject=Marketplace%20Growth%20Discussion">${EMAIL}</a><a class="btn" href="${WA}" target="_blank" rel="noopener noreferrer">WhatsApp</a></div></div></section></main>
-<footer class="footer"><div class="wrap foot"><span>© ${new Date().getFullYear()} Owais Zahoor. Professional portfolio.</span><div class="footlinks"><a href="#cases">Case Studies</a><a href="#recommendations">Recommendations</a><a href="${LINKEDIN}" target="_blank" rel="noopener noreferrer">LinkedIn</a><a href="mailto:${EMAIL}">Email</a></div></div></footer>
-<script src="/app.js" defer></script></body></html>`;
-}
-
-
-function renderAgencies(site){
- let page=renderHtml(site);
- const title='White-label Amazon & Walmart Support | Owais Zahoor';
- const description='Work directly with Owais Zahoor for white-label marketplace delivery, fractional operations leadership, and dedicated support-team recruitment and onboarding.';
- page=page.replace(/<title>[\s\S]*?<\/title>/,'<title>'+title+'</title>');
- page=page.replace(/<meta name="description" content="[^"]*">/,'<meta name="description" content="'+description+'">');
- page=page.replace(/<link rel="canonical" href="[^"]*">/,'<link rel="canonical" href="'+site+'/for-agencies">');
- for(const key of ['og:title','twitter:title'])page=page.replace(new RegExp('(<meta (?:property|name)="'+key+'" content=")[^"]*'),'$1'+title);
- for(const key of ['og:description','twitter:description'])page=page.replace(new RegExp('(<meta (?:property|name)="'+key+'" content=")[^"]*'),'$1'+description);
- page=page.replace(/(<meta property="og:url" content=")[^"]*/,'$1'+site+'/for-agencies');
- page=page.replace('content="profile"','content="website"');
- const schema={'@context':'https://schema.org','@graph':[
- {'@type':'WebPage','@id':site+'/for-agencies#page',url:site+'/for-agencies',name:title,description,about:{'@id':site+'/#person'}},
- {'@type':'Person','@id':site+'/#person',name:'Owais Zahoor',url:site+'/',sameAs:[LINKEDIN]},
- ...['White-label marketplace support','Fractional operations leadership','Dedicated support-team development'].map(name=>({'@type':'Service',name,provider:{'@id':site+'/#person'},url:site+'/for-agencies',areaServed:'Worldwide'}))]};
- page=page.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/,'<script type="application/ld+json">'+JSON.stringify(schema).replace(/</g,'\\u003c')+'</script>');
- const main=`<main id="top"><section class="hero"><div class="wrap"><div class="eyebrow">Independent specialist · For agencies</div><h1>Your brand.<br>Your clients.<br><span style="color:var(--gold)">My hands-on support.</span></h1><p class="lead">I help US and international agencies deliver Amazon and Walmart work without adding another layer between strategy and execution. Work directly with me, Owais Zahoor—not an anonymous delivery pool.</p><div class="actions"><a class="btn primary" href="mailto:${EMAIL}?subject=Agency%20partnership%20discussion">Discuss agency support</a><a class="btn" href="/#cases">Explore my work</a></div></div></section>
- <section class="section" id="models"><div class="wrap"><div class="eyebrow">Three ways to work together</div><h2>Start with the support you need today.</h2><div class="services">
- <article class="card"><h3>01 · White-label specialist</h3><p>I personally handle agreed accounts or workstreams under your agency brand: PPC, catalog, Seller Central, Vendor Central and Walmart support. You retain the client relationship.</p></article>
- <article class="card"><h3>02 · Fractional operations lead</h3><p>I help oversee delivery priorities, quality reviews, reporting, SOPs and team training. Best suited to an agency that has people in place but needs stronger operational ownership.</p></article>
- <article class="card"><h3>03 · Build your support team</h3><p>When volume justifies it, I can help define roles, evaluate candidates, recruit, onboard and lead a dedicated support team. This is a scoped build-out—not a claim that a staffed agency is already waiting.</p></article></div></div></section>
- <section class="section" id="about"><div class="wrap aboutGrid"><div><div class="eyebrow">Clear working boundaries</div><h2>You own the relationship. We agree the delivery.</h2><p class="intro">Behind-the-scenes delivery or client-facing support under your brand, depending on your preference. We agree communication, access, confidentiality and escalation rules before onboarding.</p></div><div><h3>Before we begin</h3><ul><li>Named accounts, deliverables and reporting cadence</li><li>Approved account access; no password sharing</li><li>Capacity, working-hour overlap and escalation process</li><li>Confidentiality and non-solicitation terms where agreed</li><li>Separate approval for recruitment costs and additional hires</li></ul></div></div></section>
- <section class="section"><div class="wrap"><div class="eyebrow">From first conversation to delivery</div><h2>A practical start. A clear handoff.</h2><div class="services"><article class="card"><h3>Scope the bottleneck</h3><p>Review your workload, marketplace mix, delivery gaps and existing team.</p></article><article class="card"><h3>Agree a focused engagement</h3><p>Define deliverables, fees, access, ownership and the measures of a successful first phase.</p></article><article class="card"><h3>Deliver and review</h3><p>Execute the work, document the process and decide together whether to expand support.</p></article></div></div></section>
- <section class="cta" id="contact"><div class="wrap"><div class="eyebrow">Your next delivery partner</div><h2>Tell me where your agency needs support.</h2><p class="intro" style="margin:auto">Share your marketplace mix, account volume and the work you need help with. We can discuss hands-on delivery, operations leadership or a dedicated team build-out.</p><div class="actions" style="justify-content:center"><a class="btn primary" href="mailto:${EMAIL}?subject=White-label%20agency%20support">Start a partnership conversation</a><a class="btn" href="${WA}" target="_blank" rel="noopener noreferrer">WhatsApp</a></div></div></section></main>`;
- page=page.replace(/<main[\s\S]*?<\/main>/,main);
- page=page.replaceAll('href="#','href="/#');
- return page;
-}
-
-function renderVendorChecklist(site){
-  let page=renderHtml(site);
-  const path='/vendor-central-launch-readiness-checklist';
-  const title='Amazon Vendor Central Launch Readiness Checklist | Owais Zahoor';
-  const description='A practical Amazon Vendor Central launch-readiness checklist for brands and agency teams.';
-  page=page.replace(/<title>[\s\S]*?<\/title>/,'<title>'+title+'</title>');
-  page=page.replace(/<meta name="description" content="[^"]*">/,'<meta name="description" content="'+description+'">');
-  page=page.replace(/<link rel="canonical" href="[^"]*">/,'<link rel="canonical" href="'+site+path+'">');
-  page=page.replace(/(<meta property="og:url" content=")[^"]*/,'$1'+site+path);
-  page=page.replace('content="profile"','content="article"');
-  const schema={'@context':'https://schema.org','@graph':[
-    {'@type':'Article','@id':site+path+'#article',headline:title,description:description,url:site+path,datePublished:'2026-09-18',dateModified:'2026-09-18',author:{'@id':site+'/#person'},mainEntityOfPage:site+path,keywords:['Amazon Vendor Central','Vendor Central launch checklist','Amazon vendor onboarding','purchase orders','deductions']},
-    {'@type':'BreadcrumbList','itemListElement':[{'@type':'ListItem',position:1,name:'Home',item:site+'/'},{'@type':'ListItem',position:2,name:'Vendor Central Launch Readiness Checklist',item:site+path}]},
-    {'@type':'Person','@id':site+'/#person',name:'Owais Zahoor',url:site+'/',sameAs:[LINKEDIN]}
-  ]};
-  page=page.replace(/<script type="application\/ld\+json">[\s\S]*?<\/script>/,'<script type="application/ld+json">'+JSON.stringify(schema).replace(/</g,'\\u003c')+'</script>');
-  const main='<main id="top">'
-    +'<section class="hero"><div class="wrap"><div class="eyebrow">Vendor Central resource · For brands & agency teams</div><h1>Amazon Vendor Central<br>launch readiness checklist.<small>Catch operational gaps before they become delays, shortages or deductions.</small></h1><p class="lead">A practical pre-launch framework for turning a Vendor Central setup into a commercially and operationally ready channel—not merely a completed onboarding task.</p><div class="actions"><a class="btn primary" href="mailto:'+EMAIL+'?subject=Vendor%20Central%20launch%20readiness">Discuss your Vendor Central launch</a><a class="btn" href="https://lnkd.in/p/d9jB3TZ7" target="_blank" rel="noopener noreferrer">View the original LinkedIn post</a></div></div></section>'
-    +'<section class="section" id="overview"><div class="wrap"><div class="eyebrow">How to use this</div><h2>A simple GO / NO-GO review before launch.</h2><p class="intro">Assign one owner, one due date and one success metric to every open item. If a critical item has no clear owner or evidence, the launch is not ready yet. Requirements vary by category, region and vendor agreement.</p><div class="services"><article class="card"><h3>1. Verify</h3><p>Check the commercial, catalog and operational facts in Vendor Central and connected internal systems.</p></article><article class="card"><h3>2. Assign</h3><p>Give every gap a named owner, completion date and documented source of truth.</p></article><article class="card"><h3>3. Gate the launch</h3><p>Proceed only when the launch has buyability, supply-chain readiness and a first-30-day operating plan.</p></article></div></div></section>'
-    +'<section class="section" id="checklist"><div class="wrap"><div class="eyebrow">The checklist</div><h2>Seven checks before you call a launch ready.</h2><div class="services">'
-    +'<details class="card" open><summary style="cursor:pointer;font-weight:700;font-size:20px">01 · Commercial setup and identifiers</summary><p>Confirm the vendor agreement, terms, regions, currencies, remit-to details, legal entity, item identifiers and brand ownership. Ensure the same identifiers are used consistently across PO, catalog and internal systems.</p></details>'
-    +'<details class="card"><summary style="cursor:pointer;font-weight:700;font-size:20px">02 · Detail pages and variation accuracy</summary><p>Review titles, bullets, images, A+ content where applicable, browse classification, variations, compliance attributes and retail copy. Shoppers must be able to understand, find and buy the item correctly.</p></details>'
-    +'<details class="card"><summary style="cursor:pointer;font-weight:700;font-size:20px">03 · Buyability and inventory readiness</summary><p>Validate in-stock status, landed availability, replenishment logic, lead times and allocation rules. Confirm inventory can support the launch plan—not only the first purchase order.</p></details>'
-    +'<details class="card"><summary style="cursor:pointer;font-weight:700;font-size:20px">04 · Purchase-order and shipment workflow</summary><p>Map the workflow from PO receipt through acknowledgement, routing, shipment, ASN, ARN, receiving and invoice. Check who owns every handoff and what evidence is retained when an exception occurs.</p></details>'
-    +'<details class="card"><summary style="cursor:pointer;font-weight:700;font-size:20px">05 · Freight, terms and deduction-risk controls</summary><p>Confirm freight terms, routing instructions, carton and label requirements, delivery windows and receiving evidence. Test controls against shortage, compliance and invoice deductions before volume increases.</p></details>'
-    +'<details class="card"><summary style="cursor:pointer;font-weight:700;font-size:20px">06 · First 30 days: performance ownership</summary><p>Set a weekly review covering sales, availability, PO acceptance, fill rate, shipment exceptions, receiving status, deductions, content gaps and retail actions.</p></details>'
-    +'<details class="card"><summary style="cursor:pointer;font-weight:700;font-size:20px">07 · Evidence, escalation and GO / NO-GO</summary><p>Document the validation, owner and next action for each material risk. Escalate unresolved blockers before launch. If an issue affects buyability, shipping, receiving or viability, record a deliberate GO / NO-GO decision.</p></details>'
-    +'</div></div></section>'
-    +'<section class="section" id="common-failures"><div class="wrap"><div class="eyebrow">What this prevents</div><h2>Most launch problems begin as small ownership gaps.</h2><p class="intro">Identifier mismatches, incomplete content, unclear PO ownership, unverified routing, missing ASN evidence and unmanaged deductions are easier to prevent than repair. This checklist makes those dependencies visible early.</p><div class="actions"><a class="btn" href="/for-agencies">Agency white-label support</a><a class="btn" href="/#service-directory">Explore Vendor Central support</a></div></div></section>'
-    +'<section class="cta" id="contact"><div class="wrap"><div class="eyebrow">Need a second set of eyes?</div><h2>Turn the checklist into a launch plan your team can run.</h2><p class="intro" style="margin:auto">I help brands and agencies assess Vendor Central readiness, investigate operational gaps and build clearer delivery ownership.</p><div class="actions" style="justify-content:center"><a class="btn primary" href="mailto:'+EMAIL+'?subject=Vendor%20Central%20readiness%20review">Request a readiness review</a><a class="btn" href="'+LINKEDIN+'" target="_blank" rel="noopener noreferrer">Connect on LinkedIn</a></div></div></section></main>';
-  page=page.replace(/<main[\s\S]*?<\/main>/,main);
-  page=page.replaceAll('href="#','href="/#');
-  return page;
-}
-
-function robots(site){return ['User-agent: *','Allow: /','','Sitemap: '+site+'/sitemap.xml',''].join('\n');}
-function sitemap(site){return '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+['/','/for-agencies','/vendor-central-launch-readiness-checklist'].map(path=>'<url><loc>'+site+path+'</loc></url>').join('')+'</urlset>';}
-function securityTxt(site){return ['Contact: mailto:'+EMAIL,'Canonical: '+site+'/.well-known/security.txt','Preferred-Languages: en','Expires: 2027-09-16T00:00:00.000Z',''].join('\n');}
-function llms(site){return `## Agency support\nIndependent white-label specialist, fractional operations lead, and scoped support-team recruitment and onboarding. No pre-existing staffed agency is claimed.\nDetails: ${site}/for-agencies\nServices: ${site}/#service-directory\nVendor Central launch checklist: ${site}/vendor-central-launch-readiness-checklist\n\n# Owais Zahoor\n\nOwais Zahoor is an Amazon Brand Manager and E-commerce Strategist with 4+ years of experience across Amazon Seller Central, Vendor Central, Amazon PPC, marketplace operations, listing SEO, analytics, inventory planning and Walmart advertising.\n\n## Public professional evidence\n- Managed $500K+ in advertising spend in a prior role.\n- Optimized 50+ ASINs.\n- Selected past results include 22% ACoS improvement, 30% ROAS improvement, 20% conversion improvement, 15% YoY organic traffic growth and 98% inventory in-stock maintenance across different roles or engagements.\n- Public case study: an anonymized Home & Kitchen brand grew monthly sales from $114K to $280K in under three months while ACoS improved from 37% to 23%.\n- Public case study: a Vendor Central workflow investigation identified $93.87K in deduction exposure linked to ASN/ARN associations.\n\nResults are from specific past engagements and are not guarantees of future performance.\n\n## Public contact\nEmail: ${EMAIL}\nLinkedIn: ${LINKEDIN}\nWebsite: ${site}/\n`;}
-
-function securityHeaders(res){
-  res.setHeader('X-Content-Type-Options','nosniff');
-  res.setHeader('X-Robots-Tag','index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
-  res.setHeader('Content-Language','en');
-  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
-  res.setHeader('X-Frame-Options','DENY');
-  res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=(), usb=()');
-  res.setHeader('Cross-Origin-Opener-Policy','same-origin');
-  res.setHeader('X-DNS-Prefetch-Control','off');
-  res.setHeader('Cross-Origin-Resource-Policy','same-origin');
-  res.setHeader('Origin-Agent-Cluster','?1');
-  res.setHeader('X-Permitted-Cross-Domain-Policies','none');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; img-src 'self' https://plain-eeur-prod-public.komododecks.com data:; style-src 'unsafe-inline'; script-src 'self'; base-uri 'self'; form-action 'self' mailto:; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests");
-  res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
-}
-
-const server=http.createServer((req,res)=>{
-  const u=new URL(req.url,'http://localhost');
-  const site=siteFor(req);
-  securityHeaders(res);
-  if(u.pathname==='/app.js'){res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8','Cache-Control':'no-cache'});return res.end(CLIENT_SCRIPT);}
-  if(u.pathname==='/favicon.svg'){res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=86400'});return res.end(FAVICON);}
-  if(u.pathname==='/.well-known/security.txt'){res.writeHead(200,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'public, max-age=3600'});return res.end(securityTxt(site));}
-  if(u.pathname==='/for-agencies/'){res.writeHead(301,{'Location':site+'/for-agencies'});return res.end();}
-  if(u.pathname==='/for-agencies'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'});return res.end(renderAgencies(site));}
-  if(u.pathname==='/vendor-central-launch-readiness-checklist'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'});return res.end(renderVendorChecklist(site));}
-  if(u.pathname==='/'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-cache'});return res.end(renderHtml(site));}
-  if(u.pathname==='/robots.txt'){res.writeHead(200,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'public, max-age=3600'});return res.end(robots(site));}
-  if(u.pathname==='/sitemap.xml'){res.writeHead(200,{'Content-Type':'application/xml; charset=utf-8','Cache-Control':'public, max-age=3600'});return res.end(sitemap(site));}
-  if(u.pathname==='/llms.txt'){res.writeHead(200,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'public, max-age=3600'});return res.end(llms(site));}
-  if(u.pathname==='/health'){res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});return res.end('{"status":"ok"}');}
-  if(u.pathname==='/favicon.ico'){res.writeHead(204,{'Cache-Control':'public, max-age=86400'});return res.end();}
-  res.writeHead(404,{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store'});return res.end('Not found');
-});
-server.listen(PORT,'0.0.0.0',()=>console.log('Portfolio server ready'));
+module.exports={createServer};
