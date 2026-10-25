@@ -5,7 +5,7 @@
 
 I help e-commerce brands turn advertising, retail execution, catalog operations, inventory awareness, and marketplace data into profitable, sustainable growth across Amazon and Walmart.
 
-**4+ years of experience** · **10+ brand accounts managed in a prior team-lead role** · **$500K+ advertising spend managed**
+**6 years of marketplace experience** · **10+ brand accounts managed in a prior team-lead role** · **$500K+ advertising spend managed**
 
 [Website](https://owaiszahooryourecommercegrowthpartner.github.io/OwaisZahoorYourEcommerceGrowthPartner/) · [LinkedIn](https://www.linkedin.com/in/owais-zahoor-your-success-partner) · [Email](mailto:owaiszahoor.expertize@gmail.com) · [WhatsApp](https://wa.me/923478282583)
 
@@ -67,3 +67,15 @@ Amazon Seller Central · Amazon Vendor Central · Amazon Ads · Walmart advertis
 Based in **Lahore, Pakistan** and open to marketplace growth, Amazon brand management, PPC, Seller Central, Vendor Central, and Walmart opportunities.
 
 [LinkedIn](https://www.linkedin.com/in/owais-zahoor-your-success-partner) · [Email](mailto:owaiszahoor.expertize@gmail.com) · [WhatsApp](https://wa.me/923478282583)
+
+
+
+## Site source and deployment
+
+`docs/` is the single source for all public pages, metadata and assets. GitHub Pages publishes `gh-pages:/docs` using the existing publishing workflow. The Node server serves these same files; it must not contain separate page templates.
+
+Run `npm test` before publishing. In Node production, set `PUBLIC_SITE_URL` to the canonical GitHub Pages project URL, including its path, and set `ALLOWED_HOSTS` to a comma-separated list of actual deployment hostnames. Node redirects legacy page URLs to the canonical site. `/health` remains local for health checks. Never use request headers to construct public metadata.
+
+The project-path `robots.txt` is informational; crawler policy is read at the origin root. Submit the sitemap directly in Search Console. Root-level robots configuration and retirement of any older hosting require hosting-account changes.
+
+The publishing workflow deliberately retains the existing branch-based Pages configuration. Switching to artifact-based Pages deployment requires changing the Pages source setting first. Production header support (including frame-ancestors) must be configured at a host that supports response headers.
